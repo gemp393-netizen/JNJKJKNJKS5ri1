@@ -303,9 +303,12 @@ function updateCast(url) { const b = $('btn-cast'); if (!url) { b.style.display 
 
 function loadIframe(wrap, url, server, loader, requestId) {
     if (requestId && requestId !== renderCount) return;
-    wrap.innerHTML = ''; const f = document.createElement('iframe'); f.id = 'player-frame'; f.src = url; f.allowFullscreen = true; f.style.cssText = 'width:100%;height:100%;border:none;display:block;background:#000';
-    f.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture'); f.setAttribute('scrolling', 'no'); if (server && server.sandbox) f.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-presentation allow-fullscreen');
-    wrap.appendChild(f); f.addEventListener('load', () => loader.hide(), { once: true }); setTimeout(() => loader.hide(), 15000);
+    wrap.innerHTML = ''; const f = document.createElement('iframe'); f.id = 'player-frame'; 
+    const cleanUrl = url ? url.trim() : ''; if (!cleanUrl) { loader.hide(); wrap.innerHTML = '<p>URL vacía</p>'; return; }
+    f.src = cleanUrl; f.allowFullscreen = true; f.style.cssText = 'width:100%;height:100%;border:none;display:block;background:#000';
+    f.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture'); f.setAttribute('scrolling', 'no'); 
+    if (server && server.sandbox) f.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-presentation allow-fullscreen allow-popups');
+    wrap.appendChild(f); let done = false; f.onload = () => { done = true; loader.hide(); }; setTimeout(() => { if (!done) loader.hide(); }, 8000);
 }
 
 function buildVideoPlayer(wrap, url, poster, videoType, mainLoader, server, requestId) {

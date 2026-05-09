@@ -106,11 +106,13 @@ if (SERIE.seasons) {
     SERIE.seasons.sort((a, b) => (a.id || 0) - (b.id || 0));
 }
 
-$('header-title').textContent = SERIE.title;
+const headerTitle = $('header-title');
+if (headerTitle) headerTitle.textContent = SERIE.title;
 document.title = SERIE.title;
 
 function renderTabs() {
     const tabs = $('seasons-tabs');
+    if (!tabs) return;
     tabs.innerHTML = SERIE.seasons.map((s, i) => {
         const name = s.label || `Temporada ${s.num}`;
         return `<button class="season-tab${i === activeSeason ? ' active' : ''}" data-i="${i}">${name}</button>`;
@@ -128,6 +130,7 @@ function renderEpisodes(animate) {
     const map = getWatchedMap();
     const eps = SERIE.seasons[activeSeason].episodes;
     const list = $('episodes-list');
+    if (!list) return;
     list.innerHTML = eps.map(ep => {
         const thumbStyle = ep.thumb
             ? `background-image:url('${ep.thumb}')`
@@ -260,8 +263,18 @@ function playEpisode(seasonIdx, epNum, animate = false) {
     }
     
     // Configurar botones
-    prevBtn.disabled = !prevEp;
-    nextBtn.disabled = !nextEp;
+    const isMovie = currentEpisode.type === 'movie';
+    
+    if (isMovie) {
+        if (prevBtn) prevBtn.style.display = 'none';
+        if (nextBtn) nextBtn.style.display = 'none';
+        // Si hay un divisor o barra, también podríamos ocultarla si tuviera ID/clase
+    } else {
+        if (prevBtn) prevBtn.style.display = '';
+        if (nextBtn) nextBtn.style.display = '';
+        prevBtn.disabled = !prevEp;
+        nextBtn.disabled = !nextEp;
+    }
     
     prevBtn.onclick = () => {
         if (prevEp) playEpisode(prevSeasonIdx, prevEp.num, true);
@@ -389,25 +402,25 @@ function proxyFetch(url, timeoutMs) {
 function isDirectVideo(url) {
     if (url.includes('pixeldrain.com')) return false;
     return /\.(mp4|webm|ogg|m3u8)(\?.*)?$/i.test(url) ||
-        /[\/=](mp4|webm|ogg|m3u8)[\/\?&]?/i.test(url);
+        /[\/=](mp4|webm|ogg|m3u8)([\/\?&]|$)/i.test(url);
 }
 
 function isHLS(url) {
     if (url.includes('pixeldrain.com')) return false;
     return /\.m3u8(\?.*)?$/i.test(url) ||
-        /[\/=]m3u8[\/\?&]?/i.test(url);
+        /[\/=]m3u8([\/\?&]|$)/i.test(url);
 }
 
 function detectVideoType(url) {
     if (url.includes('pixeldrain.com')) return Promise.resolve('iframe');
 
     // Si la URL ya tiene extensión reconocible, no hace falta fetch
-    if (/\.(mp4|webm|ogg)(?:[\/\?&]|$)/i.test(url)) return Promise.resolve('mp4');
-    if (/\.m3u8(?:[\/\?&]|$)/i.test(url)) return Promise.resolve('hls');
+    if (/\.(mp4|webm|ogg)(?:[\/\?&]|$)/i.test(url) || /[\/=](mp4|webm|ogg)(?:[\/\?&]|$)/i.test(url)) return Promise.resolve('mp4');
+    if (/\.m3u8(?:[\/\?&]|$)/i.test(url) || /[\/=]m3u8(?:[\/\?&]|$)/i.test(url)) return Promise.resolve('hls');
 
     // Solo tratar como iframe directamente si tiene palabras clave MUY específicas de embeds
-    // y no parece tener una extensión de video
-    if (/\/(play|embed|player|watch)\//i.test(url) && !/\.(mp4|webm|m3u8)/i.test(url)) {
+    // y no parece tener una extensión o segmento de video
+    if (/\/(play|embed|player|watch)\//i.test(url) && !/[\/=](mp4|webm|m3u8)(?:[\/\?&]|$)/i.test(url) && !/\.(mp4|webm|m3u8)/i.test(url)) {
         return Promise.resolve('iframe');
     }
 
@@ -951,45 +964,62 @@ function renderPlayer(animate = false) {
   const row = $('cfg-autowatched-row');
   let aw = localStorage.getItem('auto_watched') === '1';
   
-  function updatePill(){ pill.classList.toggle('active', aw); }
+  function updatePill(){ if(pill) pill.classList.toggle('active', aw); }
   updatePill();
   
-  $('cfg-btn').addEventListener('click', () => {
-    overlay.style.background = 'rgba(0,0,0,0.7)';
-    overlay.style.pointerEvents = 'auto';
-    sheet.style.transform = 'scale(1)';
-    sheet.style.opacity = '1';
-  });
+  const cfgBtn = $('cfg-btn');
+  if (cfgBtn) {
+    cfgBtn.addEventListener('click', () => {
+      overlay.style.background = 'rgba(0,0,0,0.7)';
+      overlay.style.pointerEvents = 'auto';
+      sheet.style.transform = 'scale(1)';
+      sheet.style.opacity = '1';
+    });
+  }
   
   function close(){
+    if (!overlay) return;
     overlay.style.background = 'rgba(0,0,0,0)';
     overlay.style.pointerEvents = 'none';
     sheet.style.transform = 'scale(0.92)';
     sheet.style.opacity = '0';
   }
   
-  overlay.addEventListener('click', e => { if(e.target === overlay) close(); });
-  $('cfg-close').addEventListener('click', close);
-  row.addEventListener('click', () => {
-    aw = !aw;
-    localStorage.setItem('auto_watched', aw ? '1' : '0');
-    updatePill();
-  });
+  if (overlay) overlay.addEventListener('click', e => { if(e.target === overlay) close(); });
+  const cfgClose = $('cfg-close');
+  if (cfgClose) cfgClose.addEventListener('click', close);
+  if (row) {
+    row.addEventListener('click', () => {
+      aw = !aw;
+      localStorage.setItem('auto_watched', aw ? '1' : '0');
+      updatePill();
+    });
+  }
 })();
 
 // ── Eventos del reproductor ───────────────────────────────
-$('btn-close-player').addEventListener('click', (e) => {
-    e.currentTarget.blur();
-    closePlayer();
-});
-$('btn-lang').addEventListener('click', (e) => {
-    e.currentTarget.blur();
-    openPicker('lang');
-});
-$('btn-srv').addEventListener('click', (e) => {
-    e.currentTarget.blur();
-    openPicker('srv');
-});
+const closePlayerBtn = $('btn-close-player');
+if (closePlayerBtn) {
+    closePlayerBtn.addEventListener('click', (e) => {
+        e.currentTarget.blur();
+        closePlayer();
+    });
+}
+
+const langBtn = $('btn-lang');
+if (langBtn) {
+    langBtn.addEventListener('click', (e) => {
+        e.currentTarget.blur();
+        openPicker('lang');
+    });
+}
+const srvBtn = $('btn-srv');
+if (srvBtn) {
+    srvBtn.addEventListener('click', (e) => {
+        e.currentTarget.blur();
+        openPicker('srv');
+    });
+}
 
 // Quitar foco de todos los botones después de hacer click
 document.addEventListener('click', (e) => {
@@ -1003,30 +1033,33 @@ document.addEventListener('click', (e) => {
 }, true);
 
 // Botón de transmitir (cast)
-$('btn-cast').addEventListener('click', (e) => {
-    const btn = e.currentTarget;
-    
-    if (!currentEpisode || !currentEpisode.langs || !currentEpisode.langs[activeLang]) {
-        return;
-    }
-    
-    const server = currentEpisode.langs[activeLang].servers[activeServer];
-    if (!server || !server.url) {
-        return;
-    }
-    
-    const url = server.url;
-    const castUrl = `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=${url.startsWith('https') ? 'https' : 'http'};package=com.instantbits.cast.webvideo;end`;
-    
-    // Quitar el foco inmediatamente
-    setTimeout(() => btn.blur(), 0);
-    
-    if (typeof window.openCastModal === 'function') {
-        window.openCastModal(castUrl);
-    } else {
-        window.location.href = castUrl;
-    }
-});
+const castBtn = $('btn-cast');
+if (castBtn) {
+    castBtn.addEventListener('click', (e) => {
+        const btn = e.currentTarget;
+        
+        if (!currentEpisode || !currentEpisode.langs || !currentEpisode.langs[activeLang]) {
+            return;
+        }
+        
+        const server = currentEpisode.langs[activeLang].servers[activeServer];
+        if (!server || !server.url) {
+            return;
+        }
+        
+        const url = server.url;
+        const castUrl = `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=${url.startsWith('https') ? 'https' : 'http'};package=com.instantbits.cast.webvideo;end`;
+        
+        // Quitar el foco inmediatamente
+        setTimeout(() => btn.blur(), 0);
+        
+        if (typeof window.openCastModal === 'function') {
+            window.openCastModal(castUrl);
+        } else {
+            window.location.href = castUrl;
+        }
+    });
+}
 
 // ── Inicialización ────────────────────────────────────────
 renderTabs();
@@ -1094,7 +1127,7 @@ if (localStorage.getItem('auto_watched') === '1') {
     }
     
     fillServers(activeLang);
-    langSelect.addEventListener('change', () => fillServers(+langSelect.value));
+    if (langSelect) langSelect.addEventListener('change', () => fillServers(+langSelect.value));
 
     typeSelect.value = '';
     comment.value = '';
@@ -1118,11 +1151,14 @@ if (localStorage.getItem('auto_watched') === '1') {
     }, 220);
   }
 
-  $('btn-report').addEventListener('click', openModal);
-  closeBtn.addEventListener('click', closeModal);
-  overlay.addEventListener('click', e => {
-    if (e.target === overlay) closeModal();
-  });
+  const reportBtn = $('btn-report');
+  if (reportBtn) reportBtn.addEventListener('click', openModal);
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+  if (overlay) {
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay) closeModal();
+    });
+  }
 
   sendBtn.addEventListener('click', async () => {
     const cfg = window.REPORT_CONFIG || {};
@@ -1190,7 +1226,7 @@ if (localStorage.getItem('auto_watched') === '1') {
       status.style.color = '#ff5050';
       status.textContent = 'Error al enviar. Intenta de nuevo.';
     } finally {
-      sendBtn.disabled = false;
+      if (sendBtn) sendBtn.disabled = false;
     }
   });
 })();

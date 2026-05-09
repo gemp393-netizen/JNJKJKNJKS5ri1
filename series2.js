@@ -191,7 +191,7 @@ function playEpisode(seasonIdx, epNum, animate = false) {
     activeSeason = seasonIdx;
     const eps = SERIE.seasons[seasonIdx].episodes;
     currentEpisode = eps.find(e => e.num === epNum);
-    
+
     if (!currentEpisode || !currentEpisode.langs) {
         alert('Este episodio no tiene servidores disponibles');
         return;
@@ -226,14 +226,14 @@ function playEpisode(seasonIdx, epNum, animate = false) {
     // Configurar botones de navegación con lógica de temporadas
     const prevBtn = $('btn-prev');
     const nextBtn = $('btn-next');
-    
+
     // Encontrar índice del episodio actual en el array
     const currentIdx = eps.findIndex(e => e.num === epNum);
-    
+
     // Buscar episodio anterior
     let prevEp = null;
     let prevSeasonIdx = seasonIdx;
-    
+
     if (currentIdx > 0) {
         // Hay episodio anterior en esta temporada
         prevEp = eps[currentIdx - 1];
@@ -245,11 +245,11 @@ function playEpisode(seasonIdx, epNum, animate = false) {
             prevSeasonIdx = seasonIdx - 1;
         }
     }
-    
+
     // Buscar episodio siguiente
     let nextEp = null;
     let nextSeasonIdx = seasonIdx;
-    
+
     if (currentIdx >= 0 && currentIdx < eps.length - 1) {
         // Hay episodio siguiente en esta temporada
         nextEp = eps[currentIdx + 1];
@@ -261,10 +261,10 @@ function playEpisode(seasonIdx, epNum, animate = false) {
             nextSeasonIdx = seasonIdx + 1;
         }
     }
-    
+
     // Configurar botones
     const isMovie = currentEpisode.type === 'movie';
-    
+
     if (isMovie) {
         if (prevBtn) prevBtn.style.display = 'none';
         if (nextBtn) nextBtn.style.display = 'none';
@@ -275,11 +275,11 @@ function playEpisode(seasonIdx, epNum, animate = false) {
         prevBtn.disabled = !prevEp;
         nextBtn.disabled = !nextEp;
     }
-    
+
     prevBtn.onclick = () => {
         if (prevEp) playEpisode(prevSeasonIdx, prevEp.num, true);
     };
-    
+
     nextBtn.onclick = () => {
         if (nextEp) playEpisode(nextSeasonIdx, nextEp.num, true);
     };
@@ -292,13 +292,17 @@ function closePlayer() {
     $('player-section').style.display = 'none';
     $('episodes-list').style.display = 'flex';
     document.querySelector('.seasons-wrap').style.display = 'block';
-    
+
     if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
     if (wolfInstance) {
         if (typeof wolfInstance.destroy === 'function') wolfInstance.destroy();
         wolfInstance = null;
     }
-    
+
+    // Detener reproducción al cerrar
+    const wrap = $('player-wrap');
+    if (wrap) wrap.innerHTML = '';
+
     currentEpisode = null;
 }
 
@@ -401,14 +405,17 @@ function proxyFetch(url, timeoutMs) {
 
 function isDirectVideo(url) {
     if (url.includes('pixeldrain.com')) return false;
+    if (url.includes('zilla-networks.com')) return true;
     return /\.(mp4|webm|ogg|m3u8)(\?.*)?$/i.test(url) ||
-        /[\/=](mp4|webm|ogg|m3u8)([\/\?&]|$)/i.test(url);
+        /[\/=](mp4|webm|ogg|m3u8)([\/\?&]|$)/i.test(url) ||
+        url.includes('/m3u8/');
 }
 
 function isHLS(url) {
     if (url.includes('pixeldrain.com')) return false;
     return /\.m3u8(\?.*)?$/i.test(url) ||
-        /[\/=]m3u8([\/\?&]|$)/i.test(url);
+        /[\/=]m3u8([\/\?&]|$)/i.test(url) ||
+        url.includes('/m3u8/');
 }
 
 function detectVideoType(url) {
@@ -452,7 +459,7 @@ function extractVideoUrl(code) {
         /["']?(?:file|src|source|hls|stream|video|link)["']?\s*[=:]\s*["'`](https?:\/\/[^"'` \s,}]{10,}(?!\.(?:js|css|png|jpg|jpeg|gif|svg|woff|woff2|ttf|otf|map|json)(?:\?|$))[^"'` \s,}]*)/i,
         /data-(?:src|url|video)=["'](https?:\/\/[^"']{10,}\.(?:m3u8|mp4|webm|ogg)[^"']*)["']/i,
     ];
-    
+
     for (let re of patterns) {
         // Convert to global exactly to search all matches, not just the first abort if pixeldrain
         const globalRe = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');
@@ -506,31 +513,31 @@ function resolveUrl(server) {
         url.includes('playmudos.com') ||
         url.includes('streamani.me');
     if (!server.deobfuscate && !isKnownObfuscated) return Promise.resolve(url);
-    
+
     console.group('🔍 resolveUrl:', url);
     console.log('⏳ Fetching via proxy...');
-    
+
     const timeout = new Promise(resolve => setTimeout(() => {
         console.warn('⏱️ Timeout — mostrando iframe directamente');
         console.groupEnd();
         resolve(url);
     }, 10000));
-    
+
     const extract = proxyFetch(url)
         .then(data => {
             let code = data.contents || '';
             console.log('📄 HTML recibido:', code.length, 'chars');
             if (!code) { console.warn('⚠️ HTML vacío'); console.groupEnd(); return url; }
-            
+
             let found = extractVideoUrl(code);
             if (found) { console.log('✅ Capa 1 (HTML crudo):', found); console.groupEnd(); return found; }
-            
+
             const scripts = [...code.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)];
             for (let si = 0; si < scripts.length; si++) {
                 found = extractVideoUrl(scripts[si][1]);
                 if (found) { console.log(`✅ Capa 2 (script #${si + 1}):`, found); console.groupEnd(); return found; }
             }
-            
+
             let current = code;
             for (let i = 0; i < 10; i++) {
                 const decoded = tryUnpack(current);
@@ -539,7 +546,7 @@ function resolveUrl(server) {
                 found = extractVideoUrl(current);
                 if (found) { console.log(`✅ Capa 3 (desofuscado ${i + 1}):`, found); console.groupEnd(); return found; }
             }
-            
+
             for (let si = 0; si < scripts.length; si++) {
                 let sc = scripts[si][1];
                 for (let i = 0; i < 8; i++) {
@@ -550,7 +557,7 @@ function resolveUrl(server) {
                     if (found) { console.log(`✅ Capa 4 (script #${si + 1} capa ${i + 1}):`, found); console.groupEnd(); return found; }
                 }
             }
-            
+
             console.warn('⚠️ No se encontró URL — usando iframe');
             console.groupEnd();
             return url;
@@ -560,7 +567,7 @@ function resolveUrl(server) {
             console.groupEnd();
             return url;
         });
-    
+
     return Promise.race([extract, timeout]);
 }
 
@@ -573,7 +580,7 @@ function updateCast(url) {
 
 function loadIframe(wrap, url, server, loader, requestId) {
     if (requestId && requestId !== renderCount) return;
-    
+
     wrap.innerHTML = '';
     const f = document.createElement('iframe');
     f.id = 'player-frame';
@@ -621,19 +628,19 @@ function loadIframe(wrap, url, server, loader, requestId) {
     adBlocker.style.cssText = 'position:absolute;inset:0;z-index:2;pointer-events:none';
     const origOpen = window.open;
     window.open = () => null;
-    
+
     iframeWrap.appendChild(f);
     iframeWrap.appendChild(adBlocker);
     wrap.appendChild(iframeWrap);
-    
-    f.addEventListener('load', () => { 
-        loader.hide(); 
-        window.open = origOpen; 
+
+    f.addEventListener('load', () => {
+        loader.hide();
+        window.open = origOpen;
     }, { once: true });
-    
-    setTimeout(() => { 
-        loader.hide(); 
-        window.open = origOpen; 
+
+    setTimeout(() => {
+        loader.hide();
+        window.open = origOpen;
     }, 15000);
 }
 
@@ -691,7 +698,7 @@ function buildVideoPlayer(wrap, url, poster, videoType, mainLoader, server, requ
 
         wolfInstance = new window.WolfPlayer('#wolf-player-container', wolfConfig);
         setTimeout(hideLoader, 2000);
-        
+
         // Forzar precarga apenas el contenedor genere la etiqueta nativa (evitamos fallos API de WolfPlayer)
         let preloadAttempts = 0;
         const preloadIv = setInterval(() => {
@@ -699,12 +706,12 @@ function buildVideoPlayer(wrap, url, poster, videoType, mainLoader, server, requ
             const v = container.querySelector('video');
             if (v) {
                 clearInterval(preloadIv);
-                
+
                 // Configuración crítica antes del load
                 if (url.includes('pixeldrain.com')) {
                     v.setAttribute('referrerpolicy', 'no-referrer');
                 }
-                
+
                 v.setAttribute('preload', 'auto');
                 if (!url.includes('.m3u8')) v.load();
             } else if (++preloadAttempts > 40) {
@@ -714,14 +721,14 @@ function buildVideoPlayer(wrap, url, poster, videoType, mainLoader, server, requ
 
         setTimeout(() => {
             if (requestId && requestId !== renderCount) return;
-            
+
             const v = container.querySelector('video');
             if (v) {
 
                 v.addEventListener('error', (e) => {
                     if (requestId && requestId !== renderCount) return;
                     console.error('❌ Error en video:', e);
-                    
+
                     if (server && server.url) {
                         const fallbackUrl = (url !== server.url) ? server.url : url;
                         console.warn('⚠️ Fallback a iframe:', fallbackUrl);
@@ -757,13 +764,13 @@ function buildVideoPlayer(wrap, url, poster, videoType, mainLoader, server, requ
                         if (requestId && requestId !== renderCount) return;
                         if (resumeChecked) return;
                         resumeChecked = true;
-                        
+
                         const currentTime = v.currentTime || 0;
                         const hasSignificantProgress = saved > 30;
                         const isNearStart = currentTime < 60 || Math.abs(currentTime - saved) > 60;
 
                         if (hasSignificantProgress && isNearStart) {
-                            showResumeToast(saved, () => { 
+                            showResumeToast(saved, () => {
                                 const jump = () => { v.currentTime = saved; v.play(); };
                                 if (v.readyState >= 1) jump();
                                 else {
@@ -893,7 +900,7 @@ function renderPlayer(animate = false) {
     wrap.innerHTML = '';
     wrap.classList.remove('loaded', 'switching');
     if (animate) wrap.classList.add('switching');
-    
+
     const loader = createLoadingOverlay(wrap);
 
     // Validar que existan los datos necesarios
@@ -957,44 +964,44 @@ function renderPlayer(animate = false) {
 }
 
 // ── Modal configuración ───────────────────────────────────
-(function(){
-  const overlay = $('cfg-overlay');
-  const sheet = $('cfg-sheet');
-  const pill = $('cfg-autowatched-pill');
-  const row = $('cfg-autowatched-row');
-  let aw = localStorage.getItem('auto_watched') === '1';
-  
-  function updatePill(){ if(pill) pill.classList.toggle('active', aw); }
-  updatePill();
-  
-  const cfgBtn = $('cfg-btn');
-  if (cfgBtn) {
-    cfgBtn.addEventListener('click', () => {
-      overlay.style.background = 'rgba(0,0,0,0.7)';
-      overlay.style.pointerEvents = 'auto';
-      sheet.style.transform = 'scale(1)';
-      sheet.style.opacity = '1';
-    });
-  }
-  
-  function close(){
-    if (!overlay) return;
-    overlay.style.background = 'rgba(0,0,0,0)';
-    overlay.style.pointerEvents = 'none';
-    sheet.style.transform = 'scale(0.92)';
-    sheet.style.opacity = '0';
-  }
-  
-  if (overlay) overlay.addEventListener('click', e => { if(e.target === overlay) close(); });
-  const cfgClose = $('cfg-close');
-  if (cfgClose) cfgClose.addEventListener('click', close);
-  if (row) {
-    row.addEventListener('click', () => {
-      aw = !aw;
-      localStorage.setItem('auto_watched', aw ? '1' : '0');
-      updatePill();
-    });
-  }
+(function () {
+    const overlay = $('cfg-overlay');
+    const sheet = $('cfg-sheet');
+    const pill = $('cfg-autowatched-pill');
+    const row = $('cfg-autowatched-row');
+    let aw = localStorage.getItem('auto_watched') === '1';
+
+    function updatePill() { if (pill) pill.classList.toggle('active', aw); }
+    updatePill();
+
+    const cfgBtn = $('cfg-btn');
+    if (cfgBtn) {
+        cfgBtn.addEventListener('click', () => {
+            overlay.style.background = 'rgba(0,0,0,0.7)';
+            overlay.style.pointerEvents = 'auto';
+            sheet.style.transform = 'scale(1)';
+            sheet.style.opacity = '1';
+        });
+    }
+
+    function close() {
+        if (!overlay) return;
+        overlay.style.background = 'rgba(0,0,0,0)';
+        overlay.style.pointerEvents = 'none';
+        sheet.style.transform = 'scale(0.92)';
+        sheet.style.opacity = '0';
+    }
+
+    if (overlay) overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    const cfgClose = $('cfg-close');
+    if (cfgClose) cfgClose.addEventListener('click', close);
+    if (row) {
+        row.addEventListener('click', () => {
+            aw = !aw;
+            localStorage.setItem('auto_watched', aw ? '1' : '0');
+            updatePill();
+        });
+    }
 })();
 
 // ── Eventos del reproductor ───────────────────────────────
@@ -1037,22 +1044,22 @@ const castBtn = $('btn-cast');
 if (castBtn) {
     castBtn.addEventListener('click', (e) => {
         const btn = e.currentTarget;
-        
+
         if (!currentEpisode || !currentEpisode.langs || !currentEpisode.langs[activeLang]) {
             return;
         }
-        
+
         const server = currentEpisode.langs[activeLang].servers[activeServer];
         if (!server || !server.url) {
             return;
         }
-        
+
         const url = server.url;
         const castUrl = `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=${url.startsWith('https') ? 'https' : 'http'};package=com.instantbits.cast.webvideo;end`;
-        
+
         // Quitar el foco inmediatamente
         setTimeout(() => btn.blur(), 0);
-        
+
         if (typeof window.openCastModal === 'function') {
             window.openCastModal(castUrl);
         } else {
@@ -1089,144 +1096,144 @@ if (localStorage.getItem('auto_watched') === '1') {
 
 
 // ── Modal de Reportes ─────────────────────────────────────
-(function(){
-  const overlay = document.getElementById('report-modal-overlay');
-  const box = document.getElementById('report-modal-box');
-  const closeBtn = document.getElementById('report-modal-close');
-  const sendBtn = document.getElementById('report-send-btn');
-  const status = document.getElementById('report-status');
-  const comment = document.getElementById('report-comment');
-  const typeSelect = document.getElementById('report-type-select');
-  const langSelect = document.getElementById('report-lang-select');
-  const srvSelect = document.getElementById('report-srv-select');
-  const formView = document.getElementById('report-form-view');
-  const successView = document.getElementById('report-success-view');
-  const successIcon = document.getElementById('report-success-icon');
+(function () {
+    const overlay = document.getElementById('report-modal-overlay');
+    const box = document.getElementById('report-modal-box');
+    const closeBtn = document.getElementById('report-modal-close');
+    const sendBtn = document.getElementById('report-send-btn');
+    const status = document.getElementById('report-status');
+    const comment = document.getElementById('report-comment');
+    const typeSelect = document.getElementById('report-type-select');
+    const langSelect = document.getElementById('report-lang-select');
+    const srvSelect = document.getElementById('report-srv-select');
+    const formView = document.getElementById('report-form-view');
+    const successView = document.getElementById('report-success-view');
+    const successIcon = document.getElementById('report-success-icon');
 
-  function openModal() {
-    if (!currentEpisode) return;
-    
-    langSelect.innerHTML = '';
-    (currentEpisode.langs || []).forEach((l, i) => {
-      const o = document.createElement('option');
-      o.value = i;
-      o.textContent = l.name;
-      if (i === activeLang) o.selected = true;
-      langSelect.appendChild(o);
-    });
+    function openModal() {
+        if (!currentEpisode) return;
 
-    function fillServers(li) {
-      srvSelect.innerHTML = '';
-      (currentEpisode.langs?.[li]?.servers || []).forEach((s, i) => {
-        const o = document.createElement('option');
-        o.value = i;
-        o.textContent = s.name;
-        if (li === activeLang && i === activeServer) o.selected = true;
-        srvSelect.appendChild(o);
-      });
-    }
-    
-    fillServers(activeLang);
-    if (langSelect) langSelect.addEventListener('change', () => fillServers(+langSelect.value));
+        langSelect.innerHTML = '';
+        (currentEpisode.langs || []).forEach((l, i) => {
+            const o = document.createElement('option');
+            o.value = i;
+            o.textContent = l.name;
+            if (i === activeLang) o.selected = true;
+            langSelect.appendChild(o);
+        });
 
-    typeSelect.value = '';
-    comment.value = '';
-    status.textContent = '';
-    formView.style.display = '';
-    successView.style.display = 'none';
-    successIcon.style.transform = 'scale(0.5)';
-    successIcon.style.opacity = '0';
-    overlay.style.display = 'flex';
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      box.style.transform = 'scale(1)';
-      box.style.opacity = '1';
-    }));
-  }
+        function fillServers(li) {
+            srvSelect.innerHTML = '';
+            (currentEpisode.langs?.[li]?.servers || []).forEach((s, i) => {
+                const o = document.createElement('option');
+                o.value = i;
+                o.textContent = s.name;
+                if (li === activeLang && i === activeServer) o.selected = true;
+                srvSelect.appendChild(o);
+            });
+        }
 
-  function closeModal() {
-    box.style.transform = 'scale(0.94)';
-    box.style.opacity = '0';
-    setTimeout(() => {
-      overlay.style.display = 'none';
-    }, 220);
-  }
+        fillServers(activeLang);
+        if (langSelect) langSelect.addEventListener('change', () => fillServers(+langSelect.value));
 
-  const reportBtn = $('btn-report');
-  if (reportBtn) reportBtn.addEventListener('click', openModal);
-  if (closeBtn) closeBtn.addEventListener('click', closeModal);
-  if (overlay) {
-    overlay.addEventListener('click', e => {
-      if (e.target === overlay) closeModal();
-    });
-  }
-
-  sendBtn.addEventListener('click', async () => {
-    const cfg = window.REPORT_CONFIG || {};
-    if (!cfg.botToken || cfg.botToken === 'TU_BOT_TOKEN_AQUI') {
-      status.style.color = '#ff5050';
-      status.textContent = 'Bot de Telegram no configurado.';
-      return;
-    }
-
-    if (!typeSelect.value) {
-      status.style.color = '#ff5050';
-      status.textContent = 'Selecciona un tipo de problema.';
-      return;
-    }
-
-    const li = +langSelect.value;
-    const si = +srvSelect.value;
-    const lang = currentEpisode.langs?.[li]?.name || '-';
-    const server = currentEpisode.langs?.[li]?.servers?.[si]?.name || '-';
-
-    const lines = [
-      '🚨 *Nuevo reporte*',
-      `🆔 *ID Serie:* \`${SERIE.id || '-'}\``,
-      `📺 *Serie:* \`${SERIE.title || '-'}\``,
-      `🎭 *Tipo:* \`Episodio\``,
-      `📅 *Temporada:* \`${activeSeason + 1}\``,
-      `🎞 *Episodio:* \`${currentEpisode.num} - ${currentEpisode.title || '-'}\``,
-      `🌐 *Idioma:* \`${lang}\``,
-      `🖥 *Servidor:* \`${server}\``,
-      `⚠️ *Problema:* \`${typeSelect.value}\``,
-      comment.value.trim() ? `💬 *Comentario:* \`${comment.value.trim()}\`` : null
-    ].filter(Boolean).join('\n');
-
-    sendBtn.disabled = true;
-    status.style.color = '#888899';
-    status.textContent = 'Enviando...';
-
-    try {
-      const body = {
-        chat_id: cfg.chatId,
-        text: lines,
-        parse_mode: 'Markdown'
-      };
-      if (cfg.topicId) body.message_thread_id = cfg.topicId;
-
-      const res = await fetch(`https://api.telegram.org/bot${cfg.botToken}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-
-      const data = await res.json();
-      if (data.ok) {
-        formView.style.display = 'none';
-        successView.style.display = '';
+        typeSelect.value = '';
+        comment.value = '';
+        status.textContent = '';
+        formView.style.display = '';
+        successView.style.display = 'none';
+        successIcon.style.transform = 'scale(0.5)';
+        successIcon.style.opacity = '0';
+        overlay.style.display = 'flex';
         requestAnimationFrame(() => requestAnimationFrame(() => {
-          successIcon.style.transform = 'scale(1)';
-          successIcon.style.opacity = '1';
+            box.style.transform = 'scale(1)';
+            box.style.opacity = '1';
         }));
-        setTimeout(closeModal, 2000);
-      } else {
-        throw new Error(data.description);
-      }
-    } catch {
-      status.style.color = '#ff5050';
-      status.textContent = 'Error al enviar. Intenta de nuevo.';
-    } finally {
-      if (sendBtn) sendBtn.disabled = false;
     }
-  });
+
+    function closeModal() {
+        box.style.transform = 'scale(0.94)';
+        box.style.opacity = '0';
+        setTimeout(() => {
+            overlay.style.display = 'none';
+        }, 220);
+    }
+
+    const reportBtn = $('btn-report');
+    if (reportBtn) reportBtn.addEventListener('click', openModal);
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+    if (overlay) {
+        overlay.addEventListener('click', e => {
+            if (e.target === overlay) closeModal();
+        });
+    }
+
+    sendBtn.addEventListener('click', async () => {
+        const cfg = window.REPORT_CONFIG || {};
+        if (!cfg.botToken || cfg.botToken === 'TU_BOT_TOKEN_AQUI') {
+            status.style.color = '#ff5050';
+            status.textContent = 'Bot de Telegram no configurado.';
+            return;
+        }
+
+        if (!typeSelect.value) {
+            status.style.color = '#ff5050';
+            status.textContent = 'Selecciona un tipo de problema.';
+            return;
+        }
+
+        const li = +langSelect.value;
+        const si = +srvSelect.value;
+        const lang = currentEpisode.langs?.[li]?.name || '-';
+        const server = currentEpisode.langs?.[li]?.servers?.[si]?.name || '-';
+
+        const lines = [
+            '🚨 *Nuevo reporte*',
+            `🆔 *ID Serie:* \`${SERIE.id || '-'}\``,
+            `📺 *Serie:* \`${SERIE.title || '-'}\``,
+            `🎭 *Tipo:* \`Episodio\``,
+            `📅 *Temporada:* \`${activeSeason + 1}\``,
+            `🎞 *Episodio:* \`${currentEpisode.num} - ${currentEpisode.title || '-'}\``,
+            `🌐 *Idioma:* \`${lang}\``,
+            `🖥 *Servidor:* \`${server}\``,
+            `⚠️ *Problema:* \`${typeSelect.value}\``,
+            comment.value.trim() ? `💬 *Comentario:* \`${comment.value.trim()}\`` : null
+        ].filter(Boolean).join('\n');
+
+        sendBtn.disabled = true;
+        status.style.color = '#888899';
+        status.textContent = 'Enviando...';
+
+        try {
+            const body = {
+                chat_id: cfg.chatId,
+                text: lines,
+                parse_mode: 'Markdown'
+            };
+            if (cfg.topicId) body.message_thread_id = cfg.topicId;
+
+            const res = await fetch(`https://api.telegram.org/bot${cfg.botToken}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            const data = await res.json();
+            if (data.ok) {
+                formView.style.display = 'none';
+                successView.style.display = '';
+                requestAnimationFrame(() => requestAnimationFrame(() => {
+                    successIcon.style.transform = 'scale(1)';
+                    successIcon.style.opacity = '1';
+                }));
+                setTimeout(closeModal, 2000);
+            } else {
+                throw new Error(data.description);
+            }
+        } catch {
+            status.style.color = '#ff5050';
+            status.textContent = 'Error al enviar. Intenta de nuevo.';
+        } finally {
+            if (sendBtn) sendBtn.disabled = false;
+        }
+    });
 })();

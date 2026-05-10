@@ -408,12 +408,26 @@ function proxyFetch(url, timeoutMs) {
     if (!GLOBAL_IS_MOBILE) {
         console.log('WOLF_INTERCEPT_URL:', url);
         console.log('🚀 [Direct Fetch] Desktop detected, bypassing proxy:', url);
-        const opts = timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {};
-        return fetch(url, opts)
-            .then(r => {
-                if (!r.ok) throw new Error('HTTP ' + r.status);
-                return r.json().catch(() => r.text().then(t => ({ contents: t })));
+
+        // Bridge para Electron: si existe ipcRenderer, esperamos la respuesta del proceso Main
+        if (window.ipcRenderer) {
+            return new Promise((resolve) => {
+                const handler = (event, res) => {
+                    if (res.originalUrl === url) {
+                        ipcRenderer.removeListener('proxy-response', handler);
+                        resolve(res.data || { contents: '' });
+                    }
+                };
+                ipcRenderer.on('proxy-response', handler);
+                // Fallback temporal si Electron tarda mucho
+                setTimeout(() => {
+                    ipcRenderer.removeListener('proxy-response', handler);
+                    fetchDirect(url, timeoutMs).then(resolve).catch(() => resolve({ contents: '' }));
+                }, 10000);
             });
+        }
+
+        return fetchDirect(url, timeoutMs);
     }
 
     console.log('🌐 [Proxy Fetch] Mobile detected, using proxy for:', url);
@@ -436,6 +450,15 @@ function proxyFetch(url, timeoutMs) {
             });
     };
     return tryProxy(0);
+}
+
+function fetchDirect(url, timeoutMs) {
+    const opts = timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {};
+    return fetch(url, opts)
+        .then(r => {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json().catch(() => r.text().then(t => ({ contents: t })));
+        });
 }
 
 function isDirectVideo(url) {

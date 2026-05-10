@@ -406,6 +406,7 @@ const CORS_PROXIES = [
 
 function proxyFetch(url, timeoutMs) {
     if (!GLOBAL_IS_MOBILE) {
+        console.log('WOLF_INTERCEPT_URL:', url);
         console.log('🚀 [Direct Fetch] Desktop detected, bypassing proxy:', url);
         const opts = timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {};
         return fetch(url, opts)

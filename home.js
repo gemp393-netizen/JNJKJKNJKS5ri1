@@ -9,15 +9,15 @@
         const name = CFG.appName || 'ANiGo';
         document.title = name;
 
-        // Header: logo imagen o texto
-        const logoEl = document.querySelector('.logo');
-        if (logoEl) {
+        // Header & Sidebar: logo imagen o texto
+        const logos = document.querySelectorAll('.logo');
+        logos.forEach(logoEl => {
             if (CFG.headerLogoUrl) {
                 logoEl.innerHTML = `<img src="${CFG.headerLogoUrl}" alt="${name}" style="height:32px;object-fit:contain;vertical-align:middle">`;
             } else {
                 logoEl.textContent = name;
             }
-        }
+        });
 
         // Banner hero
         if (CFG.bannerUrl) {

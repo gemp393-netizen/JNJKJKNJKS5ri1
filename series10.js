@@ -218,7 +218,7 @@ function playEpisode(seasonIdx, epNum, animate = false) {
 
     // Server reset on next/episode change
     activeServer = 0;
-    
+
     resumeToastShown = false;
 
     // Mostrar reproductor y ocultar interfaz de serie
@@ -309,8 +309,13 @@ function closePlayer() {
         wolfInstance = null;
     }
 
+    // Detener cualquier video residual
+    const residualVideos = $('player-wrap').querySelectorAll('video');
+    residualVideos.forEach(v => { v.pause(); v.src = ''; v.load(); v.remove(); });
+
     $('player-wrap').innerHTML = '';
     currentEpisode = null;
+    renderCount++; // Invalidar cualquier carga asíncrona en curso
 }
 
 function updateLabels() {
@@ -348,12 +353,12 @@ function openPicker(type) {
 
     sel.addEventListener('change', () => {
         const idx = +sel.value;
-        if (isLang) { 
-            activeLang = idx; 
-            activeServer = 0; 
+        if (isLang) {
+            activeLang = idx;
+            activeServer = 0;
             localStorage.setItem('preferred_lang', currentEpisode.langs[idx].name);
-        } else { 
-            activeServer = idx; 
+        } else {
+            activeServer = idx;
         }
         resumeToastShown = false;
         updateLabels();
@@ -894,7 +899,7 @@ function buildVideoPlayer(wrap, url, poster, videoType, mainLoader, server, requ
         container.appendChild(video);
         video.addEventListener('canplay', () => {
             hideLoader();
-            video.play().catch(() => {});
+            video.play().catch(() => { });
         }, { once: true });
         setTimeout(() => hideLoader(), 10000);
     }
@@ -912,8 +917,8 @@ function renderPlayer(animate = false) {
 
     wrap.innerHTML = '';
     wrap.classList.remove('loaded', 'switching');
-    if (animate) wrap.classList.add('switching');
-
+    
+    // No añadimos 'switching' aún para que el loader sea visible
     const loader = createLoadingOverlay(wrap);
 
     // Validar que existan los datos necesarios
@@ -972,6 +977,9 @@ function renderPlayer(animate = false) {
             loadIframe(wrap, server.url, server, loader, myCount);
         }
 
+        // Antes de inyectar el contenido real, preparamos la animación
+        if (animate) wrap.classList.add('switching');
+        
         requestAnimationFrame(() => requestAnimationFrame(() => wrap.classList.add('loaded')));
     });
 }

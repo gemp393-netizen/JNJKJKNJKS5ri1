@@ -917,7 +917,7 @@ function renderPlayer(animate = false) {
 
     wrap.innerHTML = '';
     wrap.classList.remove('loaded', 'switching');
-    
+
     // No añadimos 'switching' aún para que el loader sea visible
     const loader = createLoadingOverlay(wrap);
 
@@ -979,7 +979,7 @@ function renderPlayer(animate = false) {
 
         // Antes de inyectar el contenido real, preparamos la animación
         if (animate) wrap.classList.add('switching');
-        
+
         requestAnimationFrame(() => requestAnimationFrame(() => wrap.classList.add('loaded')));
     });
 }

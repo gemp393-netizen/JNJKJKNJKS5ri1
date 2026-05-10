@@ -12,6 +12,8 @@ let wolfInstance = null;
 let renderCount = 0;
 let resumeToastShown = false;
 
+const GLOBAL_IS_MOBILE = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+
 // ── Utilidades ────────────────────────────────────────────
 const $ = id => document.getElementById(id);
 
@@ -115,7 +117,10 @@ function renderTabs() {
     if (!tabs) return;
     tabs.innerHTML = SERIE.seasons.map((s, i) => {
         const name = s.label || `Temporada ${s.num}`;
-        return `<button class="season-tab${i === activeSeason ? ' active' : ''}" data-i="${i}">${name}</button>`;
+        return `<button class="season-tab${i === activeSeason ? ' active' : ''}" data-i="${i}">
+            <span>${name}</span>
+            <div class="season-indicator"></div>
+        </button>`;
     }).join('');
     tabs.querySelectorAll('.season-tab').forEach(btn =>
         btn.addEventListener('click', () => {
@@ -400,6 +405,16 @@ const CORS_PROXIES = [
 ];
 
 function proxyFetch(url, timeoutMs) {
+    if (!GLOBAL_IS_MOBILE) {
+        console.log('🖥️ Desktop detected: Bypass proxy for:', url);
+        const opts = timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {};
+        return fetch(url, opts)
+            .then(r => {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json().catch(() => r.text().then(t => ({ contents: t })));
+            });
+    }
+
     const opts = timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {};
     const tryProxy = (idx) => {
         if (idx >= CORS_PROXIES.length) return Promise.reject(new Error('Todos los proxies fallaron'));
@@ -610,8 +625,8 @@ function loadIframe(wrap, url, server, loader, requestId) {
     const iframeWrap = document.createElement('div');
     iframeWrap.style.cssText = 'position:relative;width:100%;height:100%';
 
-    // Botón pantalla completa solo para iframes de jkanime
-    if (/jkanime\.net/i.test(url)) {
+    // Botón pantalla completa solo para iframes de jkanime (solo en móvil)
+    if (/jkanime\.net/i.test(url) && GLOBAL_IS_MOBILE) {
         const iconExpand = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`;
         const iconCollapse = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></svg>`;
         const fsBtn = document.createElement('button');
@@ -672,8 +687,6 @@ function buildVideoPlayer(wrap, url, poster, videoType, mainLoader, server, requ
     const prevVideo = document.querySelector('#wolf-player-container video');
     if (prevVideo) { prevVideo.pause(); prevVideo.src = ''; }
 
-    const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-
     const container = document.createElement('div');
     container.className = 'vp-wolf-wrap';
     container.id = 'wolf-player-container';
@@ -700,14 +713,14 @@ function buildVideoPlayer(wrap, url, poster, videoType, mainLoader, server, requ
 
         if (videoType === 'hls' || isHLS(url)) {
             wolfConfig.hlsConfig = {
-                maxBufferLength: isMobile ? 20 : 60,
-                maxMaxBufferLength: isMobile ? 40 : 120,
-                maxBufferSize: isMobile ? 40 * 1000 * 1000 : 80 * 1000 * 1000,
-                startLevel: isMobile ? 0 : -1,
+                maxBufferLength: GLOBAL_IS_MOBILE ? 20 : 60,
+                maxMaxBufferLength: GLOBAL_IS_MOBILE ? 40 : 120,
+                maxBufferSize: GLOBAL_IS_MOBILE ? 40 * 1000 * 1000 : 80 * 1000 * 1000,
+                startLevel: GLOBAL_IS_MOBILE ? 0 : -1,
                 capLevelToPlayerSize: true,
                 autoStartLoad: true,
                 enableWorker: true,
-                backBufferLength: isMobile ? 15 : 40
+                backBufferLength: GLOBAL_IS_MOBILE ? 15 : 40
             };
         }
 

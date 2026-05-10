@@ -117,7 +117,10 @@ function renderTabs() {
     if (!tabs) return;
     tabs.innerHTML = SERIE.seasons.map((s, i) => {
         const name = s.label || `Temporada ${s.num}`;
-        return `<button class="season-tab${i === activeSeason ? ' active' : ''}" data-i="${i}">${name}</button>`;
+        return `<button class="season-tab${i === activeSeason ? ' active' : ''}" data-i="${i}">
+            <span>${name}</span>
+            <div class="season-indicator"></div>
+        </button>`;
     }).join('');
     tabs.querySelectorAll('.season-tab').forEach(btn =>
         btn.addEventListener('click', () => {

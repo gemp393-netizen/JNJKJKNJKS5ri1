@@ -406,7 +406,7 @@ const CORS_PROXIES = [
 
 function proxyFetch(url, timeoutMs) {
     if (!GLOBAL_IS_MOBILE) {
-        console.log('🖥️ Desktop detected: Bypass proxy for:', url);
+        console.log('🚀 [Direct Fetch] Desktop detected, bypassing proxy:', url);
         const opts = timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {};
         return fetch(url, opts)
             .then(r => {
@@ -415,6 +415,7 @@ function proxyFetch(url, timeoutMs) {
             });
     }
 
+    console.log('🌐 [Proxy Fetch] Mobile detected, using proxy for:', url);
     const opts = timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {};
     const tryProxy = (idx) => {
         if (idx >= CORS_PROXIES.length) return Promise.reject(new Error('Todos los proxies fallaron'));
@@ -545,7 +546,6 @@ function resolveUrl(server) {
     if (!server.deobfuscate && !isKnownObfuscated) return Promise.resolve(url);
 
     console.group('🔍 resolveUrl:', url);
-    console.log('⏳ Fetching via proxy...');
 
     const timeout = new Promise(resolve => setTimeout(() => {
         console.warn('⏱️ Timeout — mostrando iframe directamente');
